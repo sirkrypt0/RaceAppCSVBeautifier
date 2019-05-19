@@ -1,12 +1,14 @@
 from tkinter import *
-from tkinter import filedialog
-from tkinter import ttk
-
+from tkinter import ttk, messagebox, filedialog
+from table import *
+import os.path
 
 class GUI:
     def __init__(self):
+        self.work_stopped = False
+
         self.tk = Tk()
-        self.tk.geometry("280x320")
+        self.tk.geometry("280x340")
         self.tk.resizable(False, False)
         self.tk.title("RaceApp CSV")
 
@@ -23,7 +25,7 @@ class GUI:
         self.input_file_ety = Entry(self.tk, textvariable=self.input_file_path, width=40)
         self.input_file_ety.pack()
 
-        self.input_file_btn = Button(self.tk, text="Open input", command=self.open_input_file_dialog)
+        self.input_file_btn = Button(self.tk, text="Select input file ...", command=self.open_input_file_dialog)
         self.input_file_btn.pack(pady=5)
 
         # Output items
@@ -36,16 +38,26 @@ class GUI:
         self.output_file_ety = Entry(self.tk, textvariable=self.output_file_path, width=40)
         self.output_file_ety.pack()
 
-        self.output_file_btn = Button(self.tk, text="Save output as", command=self.open_output_file_dialog)
+        self.output_file_btn = Button(self.tk, text="Select output file ...", command=self.open_output_file_dialog)
         self.output_file_btn.pack(pady=5)
 
-        # Progress bar
-        self.progress = ttk.Progressbar(self.tk, orient="horizontal", length=200, mode="determinate")
-        self.progress.pack(pady=15)
+        # Progressbar reading
+        self.prog_read_lbl = Label(self.tk, text="READING", font=("Helvetica", 10))
+        self.prog_read_lbl.pack(pady=5)
+
+        self.progress_reading = ttk.Progressbar(self.tk, orient="horizontal", length=200, mode="determinate")
+        self.progress_reading.pack()
+
+        # Progressbar writing
+        self.prog_write_lbl = Label(self.tk, text="WRITING", font=("Helvetica", 10))
+        self.prog_write_lbl.pack(pady=5)
+
+        self.progress_writing = ttk.Progressbar(self.tk, orient="horizontal", length=200, mode="determinate")
+        self.progress_writing.pack()
 
         # Process input
         self.beautify_btn = Button(self.tk, text="Beautify!", command=self.beautify)
-        self.beautify_btn.pack()
+        self.beautify_btn.pack(pady=5)
 
         self.tk.mainloop()
 
@@ -77,8 +89,130 @@ class GUI:
         self.output_file_path.set(output_path)
         self.output_file_ety.xview(len(output_path))
 
+    def reset_progress(self):
+        self.progress_reading["maximum"] = 1
+        self.progress_reading["value"] = 0
+        self.progress_writing["maximum"] = 1
+        self.progress_writing["value"] = 0
+
+    def change_gui_state(self, active=True):
+        _state = "normal" if active else "disabled"
+
+        self.input_file_ety.config(state=_state)
+        self.input_file_btn.config(state=_state)
+        self.output_file_ety.config(state=_state)
+        self.output_file_btn.config(state=_state)
+
+        if active:
+            self.beautify_btn.config(text="Beautify!", command=self.beautify)
+        else:
+            self.beautify_btn.config(text="Cancel", command=lambda: self.leave_work_mode(True))
+
+    def enter_work_mode(self):
+        self.change_gui_state(False)
+        self.reset_progress()
+
+        self.work_stopped = False
+
+    def leave_work_mode(self, cancel=False):
+        if cancel:
+            result = messagebox.askquestion("Cancel",
+                                            "Are you sure that you want to cancel?",
+                                            icon="warning")
+            if result != "yes":
+                return
+
+            self.reset_progress()
+        self.change_gui_state(True)
+
+        self.work_stopped = True
+
     def beautify(self):
-        pass
+        if os.path.isfile(self.output_file_path.get()):
+            result = messagebox.askquestion("Overwriting",
+                                            "Output file already exists! Do you want to overwrite it?",
+                                            icon="warning")
+            if result != "yes":
+                return
+
+        self.enter_work_mode()
+
+        try:
+            input_file = open(self.input_file_path.get(), "r")
+            input_data = input_file.readlines()
+            input_file.close()
+        except FileNotFoundError as e:
+            messagebox.showerror("Open error", "Error opening file: "+e.strerror)
+            self.leave_work_mode(True)
+            return
+        except PermissionError as e:
+            messagebox.showerror("Open error", "Error opening file: " + e.strerror)
+            self.leave_work_mode(True)
+            return
+
+        # Start time is always defined in the second last line
+        start_time = int(input_data[-2].split(",")[-1])
+
+        # Stop time is always defined in the last line
+        stop_time_full = int(input_data[-1].split(",")[-1])
+        stop_time = stop_time_full - start_time
+
+        # Init table with all rows, add 1 as we want stop_time to be part of table
+        # Might be very slow
+        # table = {i: TableEntry() for i in range(stop_time+1)}
+        table = {}
+
+        current_reading_operation_amount = 0
+        self.progress_reading["maximum"] = len(input_data)
+
+        for line in input_data[1:-2]:
+            self.tk.update()
+            self.tk.update_idletasks()
+
+            self.progress_reading["value"] = current_reading_operation_amount
+            line_array = line.split(",")
+            timestamp = int(line_array[-1])-start_time
+
+            # If we find a value that was recorded before lap started or after stopped ignore it
+            if timestamp < 0 or timestamp > stop_time:
+                continue
+
+            if timestamp not in table:
+                table[timestamp] = TableEntry()
+
+            table[timestamp].add_from_line_array(line_array)
+
+            current_reading_operation_amount += 1
+
+            if self.work_stopped:
+                return
+
+        writing_operation_amount = len(table)
+        current_writing_operation_amount = 0
+        self.progress_writing["maximum"] = writing_operation_amount
+
+        # Maybe try those, might speed up
+        # output = ""
+        # output = [""] * stop_time
+        output_file = open(self.output_file_path.get(), "w")
+
+        for row in table.values():
+            self.tk.update()
+            self.tk.update_idletasks()
+
+            output_file.write(str(row)+"\n")
+
+            self.progress_writing["value"] = current_writing_operation_amount
+            current_writing_operation_amount += 1
+
+            if self.work_stopped:
+                output_file.close()
+                return
+
+        output_file.close()
+
+        self.leave_work_mode()
+        messagebox.showinfo("CSV beautify done!", "The CSV has been successfully beautified!")
 
 
 if __name__ == '__main__':
