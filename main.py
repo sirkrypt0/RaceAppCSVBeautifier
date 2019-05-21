@@ -1,6 +1,7 @@
 from tkinter import *
 from tkinter import ttk, messagebox, filedialog
 from table import *
+from pandas import DataFrame
 import os.path
 
 class GUI:
@@ -8,7 +9,7 @@ class GUI:
         self.work_stopped = False
 
         self.tk = Tk()
-        self.tk.geometry("280x340")
+        self.tk.geometry("280x370")
         self.tk.resizable(False, False)
         self.tk.title("RaceApp CSV")
 
@@ -22,7 +23,7 @@ class GUI:
         self.input_file_path = StringVar()
         self.input_file_path.set("")
 
-        self.input_file_ety = Entry(self.tk, textvariable=self.input_file_path, width=40)
+        self.input_file_ety = Entry(self.tk, textvariable=self.input_file_path, width=30)
         self.input_file_ety.pack()
 
         self.input_file_btn = Button(self.tk, text="Select input file ...", command=self.open_input_file_dialog)
@@ -35,7 +36,7 @@ class GUI:
         self.output_file_path = StringVar()
         self.output_file_path.set("")
 
-        self.output_file_ety = Entry(self.tk, textvariable=self.output_file_path, width=40)
+        self.output_file_ety = Entry(self.tk, textvariable=self.output_file_path, width=30)
         self.output_file_ety.pack()
 
         self.output_file_btn = Button(self.tk, text="Select output file ...", command=self.open_output_file_dialog)
@@ -71,7 +72,7 @@ class GUI:
 
         self.input_file_path.set(input_path)
         input_split = input_path.split(".")
-        input_split[-2] += "_output"
+        input_split[-1] = "xlsx"
         output_path = ".".join(input_split)
         self.output_file_path.set(output_path)
 
@@ -82,7 +83,7 @@ class GUI:
         init_dir = "/".join(self.input_file_path.get().split("/")[:-1])
         output_path = filedialog.asksaveasfilename(initialdir=init_dir,
                                                    title="Select output",
-                                                   filetypes=(("CSV files", "*.csv"), ("all files", "*.*")))
+                                                   filetypes=(("XLSX files", "*.xlsx"), ("all files", "*.*")))
         if len(output_path.strip()) == 0:
             return
 
@@ -90,10 +91,10 @@ class GUI:
         self.output_file_ety.xview(len(output_path))
 
     def reset_progress(self):
-        self.progress_reading["maximum"] = 1
         self.progress_reading["value"] = 0
-        self.progress_writing["maximum"] = 1
+        self.progress_reading["maximum"] = 1
         self.progress_writing["value"] = 0
+        self.progress_writing["maximum"] = 1
 
     def change_gui_state(self, active=True):
         _state = "normal" if active else "disabled"
@@ -178,7 +179,7 @@ class GUI:
                 continue
 
             if timestamp not in table:
-                table[timestamp] = TableEntry()
+                table[timestamp] = TableEntry(timestamp)
 
             table[timestamp].add_from_line_array(line_array)
 
@@ -191,25 +192,29 @@ class GUI:
         current_writing_operation_amount = 0
         self.progress_writing["maximum"] = writing_operation_amount
 
-        # Maybe try those, might speed up
-        # output = ""
-        # output = [""] * stop_time
-        output_file = open(self.output_file_path.get(), "w")
+        # Create new Dataframe
+        cols = [d.value for d in DataType]
+        # Ignore the GEOLOCATION as we split this up
+        df = DataFrame(columns=cols[1:])
+        current_index = 0
+        print("Reading done, found", len(table), "timestamps, stop time:", stop_time)
 
         for row in table.values():
             self.tk.update()
             self.tk.update_idletasks()
-
-            output_file.write(str(row)+"\n")
-
             self.progress_writing["value"] = current_writing_operation_amount
+
+            df.loc[current_index] = row.get_entry()
+            # print("Done:", current_index, row.get_entry())
+            current_index += 1
+
             current_writing_operation_amount += 1
 
             if self.work_stopped:
-                output_file.close()
+                del df
                 return
 
-        output_file.close()
+        df.to_excel(self.output_file_ety.get(), index=False)
 
         self.leave_work_mode()
         messagebox.showinfo("CSV beautify done!", "The CSV has been successfully beautified!")
