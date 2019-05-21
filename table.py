@@ -3,7 +3,9 @@ import enum
 
 class DataType(enum.Enum):
     GEO = "GEOLOCATION"
-    TSP = "TIMESTAMP"
+    TSS = "TIMESTAMP_START"
+    TSP = "TIMESTAMP_LARGE"
+    TSR = "TIMESTAMP_SMALL"
     GX1 = "GEOLOC1.1"
     GY1 = "GEOLOC1.2"
     GX2 = "GEOLOC2.1"
@@ -18,7 +20,9 @@ class DataType(enum.Enum):
 
 
 class TableEntry:
-    def __init__(self, timestamp):
+    def __init__(self, start, large, timestamp):
+        self.timestamp_start = start
+        self.timestamp_large = large
         self.timestamp = timestamp
         self.geolocation = ["N/A", "N/A", "N/A", "N/A"]
         self.displayedvehiclespeed = "N/A"
@@ -31,9 +35,10 @@ class TableEntry:
         self.changed = False
 
     def get_entry(self):
-        return [self.timestamp, self.geolocation[0], self.geolocation[1], self.geolocation[2], self.geolocation[3],
-                self.displayedvehiclespeed, self.enginetorque, self.boostpressure, self.brakingpressure,
-                self.lateralacceleration, self.longitudinalacceleration, self.pedalforce]
+        return [self.timestamp_start, self.timestamp_large, self.timestamp, self.geolocation[0], self.geolocation[1],
+                self.geolocation[2], self.geolocation[3], self.displayedvehiclespeed, self.enginetorque,
+                self.boostpressure, self.brakingpressure, self.lateralacceleration, self.longitudinalacceleration,
+                self.pedalforce]
 
     def add_from_line_array(self, line_array):
         data_type = line_array[1]

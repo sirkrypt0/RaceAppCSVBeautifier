@@ -1,12 +1,14 @@
 from tkinter import *
 from tkinter import ttk, messagebox, filedialog
 from table import *
+import numpy
 from pandas import DataFrame
 import os.path
 
 class GUI:
     def __init__(self):
         self.work_stopped = False
+        self.init_dir = "/"
 
         self.tk = Tk()
         self.tk.geometry("280x370")
@@ -80,7 +82,7 @@ class GUI:
         self.output_file_ety.xview(len(output_path))
 
     def open_output_file_dialog(self):
-        init_dir = "/".join(self.input_file_path.get().split("/")[:-1])
+        init_dir = self.init_dir.join(self.input_file_path.get().split("/")[:-1])
         output_path = filedialog.asksaveasfilename(initialdir=init_dir,
                                                    title="Select output",
                                                    filetypes=(("XLSX files", "*.xlsx"), ("all files", "*.*")))
@@ -147,7 +149,15 @@ class GUI:
             self.leave_work_mode(True)
             return
         except PermissionError as e:
-            messagebox.showerror("Open error", "Error opening file: " + e.strerror)
+            messagebox.showerror("Open error", "Error opening file: " + e.strerror + "Maybe it's still opened?")
+            self.leave_work_mode(True)
+            return
+
+        try:
+            output_file = open(self.output_file_path.get(), "r")
+            output_file.close()
+        except PermissionError as e:
+            messagebox.showerror("Open error", "Error opening file: " + e.strerror + "Maybe it's still opened?")
             self.leave_work_mode(True)
             return
 
@@ -172,14 +182,15 @@ class GUI:
 
             self.progress_reading["value"] = current_reading_operation_amount
             line_array = line.split(",")
-            timestamp = int(line_array[-1])-start_time
+            timestamp_large = int(line_array[-1])
+            timestamp = timestamp_large-start_time
 
             # If we find a value that was recorded before lap started or after stopped ignore it
             if timestamp < 0 or timestamp > stop_time:
                 continue
 
             if timestamp not in table:
-                table[timestamp] = TableEntry(timestamp)
+                table[timestamp] = TableEntry(start_time, timestamp_large, timestamp)
 
             table[timestamp].add_from_line_array(line_array)
 
@@ -199,12 +210,12 @@ class GUI:
         current_index = 0
         print("Reading done, found", len(table), "timestamps, stop time:", stop_time)
 
-        for row in table.values():
+        for time_row in sorted(table.items()):
             self.tk.update()
             self.tk.update_idletasks()
             self.progress_writing["value"] = current_writing_operation_amount
 
-            df.loc[current_index] = row.get_entry()
+            df.loc[current_index] = time_row[1].get_entry()
             # print("Done:", current_index, row.get_entry())
             current_index += 1
 
