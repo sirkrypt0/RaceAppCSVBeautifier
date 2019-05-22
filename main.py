@@ -1,9 +1,9 @@
 from tkinter import *
 from tkinter import ttk, messagebox, filedialog
 from table import *
-import numpy
-from pandas import DataFrame
+from openpyxl import Workbook
 import os.path
+
 
 class GUI:
     def __init__(self):
@@ -154,8 +154,9 @@ class GUI:
             return
 
         try:
-            output_file = open(self.output_file_path.get(), "r")
-            output_file.close()
+            if os.path.isfile(self.output_file_path.get()):
+                output_file = open(self.output_file_path.get(), "r")
+                output_file.close()
         except PermissionError as e:
             messagebox.showerror("Open error", "Error opening file: " + e.strerror + "Maybe it's still opened?")
             self.leave_work_mode(True)
@@ -203,29 +204,30 @@ class GUI:
         current_writing_operation_amount = 0
         self.progress_writing["maximum"] = writing_operation_amount
 
-        # Create new Dataframe
         cols = [d.value for d in DataType]
-        # Ignore the GEOLOCATION as we split this up
-        df = DataFrame(columns=cols[1:])
+        # Create new Excel workbook and sheet
+        book = Workbook()
+        sheet = book.active
         current_index = 0
-        print("Reading done, found", len(table), "timestamps, stop time:", stop_time)
 
+        # Ignore the GEOLOCATION as we split it up into 4 values
+        sheet.append(cols[1:])
         for time_row in sorted(table.items()):
             self.tk.update()
             self.tk.update_idletasks()
             self.progress_writing["value"] = current_writing_operation_amount
 
-            df.loc[current_index] = time_row[1].get_entry()
-            # print("Done:", current_index, row.get_entry())
+            # df.loc[current_index] = time_row[1].get_entry()
+            sheet.append(time_row[1].get_entry())
             current_index += 1
 
             current_writing_operation_amount += 1
 
             if self.work_stopped:
-                del df
+                del book
                 return
 
-        df.to_excel(self.output_file_ety.get(), index=False)
+        book.save(self.output_file_ety.get())
 
         self.leave_work_mode()
         messagebox.showinfo("CSV beautify done!", "The CSV has been successfully beautified!")
