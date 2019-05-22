@@ -184,7 +184,7 @@ class GUI:
             self.progress_reading["value"] = current_reading_operation_amount
             line_array = line.split(",")
             timestamp_large = int(line_array[-1])
-            timestamp = timestamp_large-start_time
+            timestamp = float(timestamp_large-start_time)/1000.0
 
             # If we find a value that was recorded before lap started or after stopped ignore it
             if timestamp < 0 or timestamp > stop_time:
@@ -218,7 +218,6 @@ class GUI:
             self.tk.update_idletasks()
             self.progress_writing["value"] = current_writing_operation_amount
 
-            # df.loc[current_index] = time_row[1].get_entry()
             sheet.append(time_row[1].get_entry())
             current_index += 1
 
