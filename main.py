@@ -13,9 +13,9 @@ class GUI:
         self.tk = Tk()
         self.tk.geometry("280x370")
         self.tk.resizable(False, False)
-        self.tk.title("RaceApp CSV")
+        self.tk.title("RaceApp CSV to Excel")
 
-        self.title_lbl = Label(self.tk, text="Race App CSV Beautifier", font=("Helvetica", 16))
+        self.title_lbl = Label(self.tk, text="Race App CSV to Excel", font=("Helvetica", 16))
         self.title_lbl.pack(pady=5)
 
         # Input items
@@ -59,7 +59,7 @@ class GUI:
         self.progress_writing.pack()
 
         # Process input
-        self.beautify_btn = Button(self.tk, text="Beautify!", command=self.beautify)
+        self.beautify_btn = Button(self.tk, text="To Excel!", command=self.beautify)
         self.beautify_btn.pack(pady=5)
 
         self.tk.mainloop()
@@ -107,7 +107,7 @@ class GUI:
         self.output_file_btn.config(state=_state)
 
         if active:
-            self.beautify_btn.config(text="Beautify!", command=self.beautify)
+            self.beautify_btn.config(text="To excel!", command=self.beautify)
         else:
             self.beautify_btn.config(text="Cancel", command=lambda: self.leave_work_mode(True))
 
@@ -198,6 +198,7 @@ class GUI:
             current_reading_operation_amount += 1
 
             if self.work_stopped:
+                self.progress_reading["value"] = 0
                 return
 
         writing_operation_amount = len(table)
@@ -225,12 +226,13 @@ class GUI:
 
             if self.work_stopped:
                 del book
+                self.progress_writing["value"] = 0
                 return
 
         book.save(self.output_file_ety.get())
 
         self.leave_work_mode()
-        messagebox.showinfo("CSV beautify done!", "The CSV has been successfully beautified!")
+        messagebox.showinfo("CSV to Excel done!", "The CSV has been successfully converted to XLSX!")
 
 
 if __name__ == '__main__':
